@@ -7,7 +7,7 @@
 #  Bind 9 must be installed and default zone directory is /etc/bind/zones/
 #
 #  File format is space separated.
-#  	 
+#
 #
 ##########################################################################
 
@@ -16,10 +16,17 @@ bind9WrDir="/etc/bind/"
 zoneWrDir="/etc/bind/zones/" #Change me, if needed
 editedFiles=()
 
+
+#
+# parameter 1 is ip ex "192.168.10.3"
+# return array, "10.168.192 3"
+#
 function getReverseip {
         ip=$1
         echo $(echo $ip | awk 'BEGIN { FS = "." } ; { print $3"."$2"."$1" "$4;}')
 }
+
+
 
 function createForwardZone {
 	echo "Domain name for this domain?"
@@ -67,6 +74,9 @@ function createForwardZone {
 	fi
 }
 
+#
+# Increment serial, input is file.
+#
 function incrementSerial {
 	file=$1
 	line=$(grep -n Serial $file)
@@ -82,7 +92,7 @@ function createReverseZone {
 	then
 		#IP for zone
 		ip=$1
-		#DNS server this zone FQDN
+		#DNS server for this zone FQDN
 		dns=$2
 	fi
 
@@ -100,7 +110,7 @@ function createReverseZone {
 		echo "Ei ole m22ratud piisavalt andemid."
 		echo "Sisestage IP selle reverse domeeni jaoks. Reverse tsoon tehakse /24"
 		read ipAddress
-		echo "sisestage DNS masina FQDN, mis tegeleb selle domeeniga"
+		echo "sisestage DNS masina FQDN, mis tegeleb selle domeeniga ns1.local.lan."
 		read dnsFQDN
 		ip=$ipAddress
 		dns=$dnsFQDN
@@ -154,7 +164,7 @@ function addEntry {
 
 		if [ $? -eq 0 ]
 		then
-			echo "Succefully added A record $hostname to $zoneName with ip $ip"
+			echo "Successfully added A record $hostname to $zoneName with ip $ip"
 			if [ $(containsFile $file) == "False" ]
 			then
 				editedFiles+=($file)
@@ -172,7 +182,7 @@ function addEntry {
 		
 		if [ $? -eq 0 ]
 		then
-			echo "Reverse record added succefully"
+			echo "Reverse record added successfully"
 			if [ $(containsFile $file) == "False" ]
 			then
 				editedFiles+=($file)
@@ -239,7 +249,7 @@ function userChoice {
 			
 			if [ $? -eq 0 ]
 			then
-				echo "Hostname $hostNameFromFile replaced succefully with $5"
+				echo "Hostname $hostNameFromFile replaced successfully with $5"
 			fi
 
 
@@ -273,7 +283,8 @@ function userChoice {
 			#then
 			#		echo "Rea asendamine 6nnestus edukalt"
 			#fi
-			echo "TEST"
+			
+			echo "SKIP"
 			;;
 	esac
 }
@@ -336,7 +347,18 @@ function controllInput {
 			fi
 			;;
 		"PTR")
-			echo "test"
+			local reverseIP=($(getReverseip $IP))
+			reverseFile="${zoneWrDir}db.${reverseIP[0]}"  
+			
+			
+			if [ ! -f $reverseFile ]
+			then
+				echo "No reverse file for this ip subnet, creating one"
+				createReverseZone $IP
+			else
+				addEntry $HOSTNAME $ZONENAME "PTR" $IP
+			fi
+
 			;;
 		*)
 			echo "Unkown type"
@@ -386,13 +408,15 @@ then
 		if [ ! -d $newLocation ]
 		then
 			mkdir -p $newLocation
+			$zoneWrDir=$newLocation
+			
 		fi
 	fi
 fi
 
 
 #
-#  INPUT FROM FILE, FILE FORMAT:"hostname domainz/oneName type ip address" 
+#  INPUT FROM FILE, FILE FORMAT:"hostname domainz/zoneName type ip-address" 
 #
 
 if [ $# -eq 1 ]
